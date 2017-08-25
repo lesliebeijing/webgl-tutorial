@@ -12,7 +12,6 @@
 
 <script>
     var VERTEX_SHADER_SOURCE =
-        'attribute vec4 a_Position;\n' +
         'void main() {\n' +
         '   gl_Position = vec4(0.0,0.0,0.0,1.0);\n' +
         '   gl_PointSize = 10.0;\n' +
@@ -64,7 +63,7 @@
         // check compile status
         var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
         if (!compiled) {
-            var error = gl.getShaderInfoLfragmentShaderSourceog(shader);
+            var error = gl.getShaderInfoLog(shader);
             console.log('Failed to compile shader: ' + error);
             return null;
         }
