@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>draw triangles</title>
+</head>
+<body>
+
+<canvas id="canvas" width="400" height="400">
+    Please use a browser that supports "canvas"
+</canvas>
+
+<script>
+    // vertex shader
+    var VERTEX_SHADER_SOURCE =
+            'attribute vec4 a_Position;\n' +
+            'attribute vec4 a_Color;\n' +
+            'varying vec4 v_Color;\n' +
+
+            'void main() {\n' +
+            '   gl_Position = a_Position;\n' +
+            '   gl_PointSize = 10.0;\n' +
+            '   v_Color = a_Color;\n' +
+            '}\n';
+
+    // fragment shader
+    var FRAGMENT_SHADER_SOURCE =
+            'precision mediump float;\n' +
+            'varying vec4 v_Color;\n' +
+
+            'void main() {\n' +
+            '   gl_FragColor = v_Color;\n' +
+            '}\n';
+
+    var canvas = document.getElementById("canvas");
+    var gl = canvas.getContext('webgl');
+
+    if (!initShaders(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE)) {
+        alert('Failed to init shaders');
+    }
+
+    var vertices = new Float32Array([
+        0.0, 0.5, 1.0, 0.0, 0.0, // (x,y) (r,g,b)
+        -0.5, -0.5, 0.0, 1.0, 0.0,
+        0.5, -0.5, 0.0, 0.0, 1.0
+    ]);
+
+    initVertexBuffers(gl, vertices);
+
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    function initVertexBuffers(gl, vertices) {
+        var vertexBuffer = gl.createBuffer();
+        if (!vertexBuffer) {
+            console.log('Failed to create buffer object');
+            return -1;
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+        var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+        var a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+
+        var BYTES_PER_ELEMENT = vertices.BYTES_PER_ELEMENT;
+
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 5 * BYTES_PER_ELEMENT, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+        gl.vertexAttribPointer(a_Color, 3, gl.FLOAT, false, 5 * BYTES_PER_ELEMENT, 2 * BYTES_PER_ELEMENT);
+        gl.enableVertexAttribArray(a_Color);
+    }
+
+    function initShaders(gl, vertexShaderSource, fragmentShaderSource) {
+        var program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+        if (!program) {
+            console.log('Failed to create program');
+            return false;
+        }
+
+        gl.useProgram(program);
+        gl.program = program;
+
+        return true;
+    }
+
+    function loadShader(gl, type, source) {
+        // create shader object
+        var shader = gl.createShader(type);
+        if (shader == null) {
+            console.log('unable to create shader');
+            return null;
+        }
+
+        // set shader source code
+        gl.shaderSource(shader, source);
+
+        // compile the shader
+        gl.compileShader(shader);
+
+        // check compile status
+        var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+        if (!compiled) {
+            var error = gl.getShaderInfoLog(shader);
+            console.log('Failed to compile shader: ' + error);
+            return null;
+        }
+
+        return shader;
+    }
+
+    function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+        var vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        var fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+        if (!vertexShader || !fragmentShader) {
+            return null;
+        }
+
+        // create a program object
+        var program = gl.createProgram();
+        if (!program) {
+            console.log('gl.createProgram failed');
+            return null;
+        }
+
+        // attach  the shader objects
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+
+        // link the program object
+        gl.linkProgram(program);
+
+        // check link status
+        var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+        if (!linked) {
+            var error = gl.getProgramInfoLog(program);
+            console.log('Failed to link program: ' + error);
+            gl.deleteProgram(program);
+            gl.deleteShader(vertexShader);
+            gl.deleteShader(fragmentShader);
+            return null;
+        }
+
+        return program;
+    }
+
+</script>
+</body>
+</html>
