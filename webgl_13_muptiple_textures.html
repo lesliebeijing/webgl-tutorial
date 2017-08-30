@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8"/>
-    <title>basic animation</title>
+    <title>multiple textures</title>
 </head>
 <body>
 
@@ -10,21 +10,29 @@
     Please use a browser that supports "canvas"
 </canvas>
 
-<script src="lib/cuon-matrix.js"></script>
-
 <script>
     // vertex shader
     var VERTEX_SHADER_SOURCE =
         'attribute vec4 a_Position;\n' +
-        'uniform mat4 u_ModelMatrix;\n' +
+        'attribute vec2 a_TexCoord;\n' +
+        'varying vec2 v_TexCoord;\n' +
+
         'void main() {\n' +
-        '   gl_Position = u_ModelMatrix * a_Position;\n' +
+        '   gl_Position = a_Position;\n' +
+        '   v_TexCoord = a_TexCoord;\n' +
         '}\n';
 
     // fragment shader
     var FRAGMENT_SHADER_SOURCE =
+        'precision mediump float;\n' +
+        'varying vec2 v_TexCoord;\n' +
+        'uniform sampler2D u_Sampler0;\n' +
+        'uniform sampler2D u_Sampler1;\n' +
+
         'void main() {\n' +
-        '   gl_FragColor = vec4(1.0,0.0,0.0,1.0);\n' +
+        '   vec4 color0 = texture2D(u_Sampler0, v_TexCoord);\n' +
+        '   vec4 color1 = texture2D(u_Sampler1, v_TexCoord);\n' +
+        '   gl_FragColor = color0 * color1;\n' +
         '}\n';
 
     var canvas = document.getElementById("canvas");
@@ -36,43 +44,33 @@
     }
 
     var vertices = new Float32Array([
-        0.0, 0.5,
-        -0.5, -0.5,
-        0.5, -0.5
+        -0.5, 0.5, 0.0, 1.0, // 前 2 位是位置坐标， 后 2 位是纹理坐标
+        -0.5, -0.5, 0.0, 0.0,
+        0.5, 0.5, 1.0, 1.0,
+        0.5, -0.5, 1.0, 0.0
     ]);
 
     initVertexBuffers(gl, vertices);
 
-    var u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+    var u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0');
+    var u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
 
-    var ANGLE_STEP = 45.0;
-    var currentAngle = 0.0;
-    var modelMatrix = new Matrix4();
+    var image0Loaded = false;
+    var image1Loaded = false;
 
-    var g_last = Date.now();
-    function animate(angle) {
-        var now = Date.now();
-        var elapsed = now - g_last;
-        g_last = now;
-
-        var newAngle = angle + (ANGLE_STEP * elapsed) / 1000.0;
-        return newAngle %= 360;
-    }
-
-    function draw() {
-        modelMatrix.setRotate(currentAngle, 0, 0, 1);
-        gl.uniformMatrix4fv(u_ModelMatrix, false, modelMatrix.elements);
-
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-    }
-
-    var tick = function () {
-        currentAngle = animate(currentAngle);
-        draw();
-        requestAnimationFrame(tick);
+    var image0 = new Image();
+    image0.onload = function () {
+        image0Loaded = true;
+        loadTexture(image0, 0, u_Sampler0);
     };
-    tick();
+    image0.src = 'images/sky.jpg';
+
+    var image1 = new Image();
+    image1.onload = function () {
+        image1Loaded = true;
+        loadTexture(image1, 1, u_Sampler1);
+    };
+    image1.src = 'images/circle.gif';
 
     function initVertexBuffers(gl, vertices) {
         var vertexBuffer = gl.createBuffer();
@@ -84,9 +82,44 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
+        var FSIZE = vertices.BYTES_PER_ELEMENT;
+
         var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 4 * FSIZE, 0);
         gl.enableVertexAttribArray(a_Position);
+
+        var a_TexCoord = gl.getAttribLocation(gl.program, 'a_TexCoord');
+        gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, 4 * FSIZE, 2 * FSIZE);
+        gl.enableVertexAttribArray(a_TexCoord);
+    }
+
+    function loadTexture(image, textureUnit, u_Sampler) {
+        var texture = gl.createTexture();
+        // 翻转 Y 轴
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+
+        if (textureUnit == 0) {
+            gl.activeTexture(gl.TEXTURE0);
+        } else if (textureUnit == 1) {
+            gl.activeTexture(gl.TEXTURE1);
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+        gl.uniform1i(u_Sampler, textureUnit);
+
+        if (image1Loaded && image1Loaded) {
+            // 两个图片都加载完毕后再绘制
+            draw();
+        }
+    }
+
+    function draw() {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
     function initShaders(gl, vertexShaderSource, fragmentShaderSource) {
